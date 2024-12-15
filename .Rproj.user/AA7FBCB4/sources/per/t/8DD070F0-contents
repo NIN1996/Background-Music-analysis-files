@@ -1,0 +1,245 @@
+# Load necessary library
+library(dplyr)
+library(stringr)
+library(openxlsx)
+
+
+
+# Renaming columns in Raw_Data
+Raw_Data <- Raw_Data %>%
+  rename(
+    ID = `ID`,
+    Timestamp = `Timestamp`,
+    Consent = `I agree to participate in the survey under the conditions described above.`,
+    Age_18_Plus = `Are you 18 years or older?`,
+    Q1_Music_Listen = `Q1 Do you ever listen to background music?`,
+    Q2_Freq_Complex = `Q2 How often do you listen to background music during the following tasks? [Complex tasks (studying, reading, writing)]`,
+    Q2_Freq_Simple = `Q2 How often do you listen to background music during the following tasks? [Simple tasks (travel, household chores, repetitive tasks)]`,
+    Q3_Text_Categories = `Q3 Text Categories`,
+    
+    Q4_Complex_Type = `Q4 What types of background music do you listen to while performing following tasks? [Complex tasks]`,
+    Q4_Simple_Type = `Q4 What types of background music do you listen to while performing following tasks? [Simple tasks]`,
+    Q4_Other_Type = `Q4 What types of background music do you listen to while performing following tasks? [Other (tasks I specified in Q3)]`,
+    
+    Q5_Other_Music_Type = `Q5 If you listen to any other types of background music while performing tasks please specify:`,
+    Q5_Text_Categories = `Q5 Text Categories`,
+    
+    Q6_Complex_Reason = `Q6 Why do you listen to background music while performing following tasks? [Complex tasks]`,
+    Q6_Simple_Reason = `Q6 Why do you listen to background music while performing following tasks? [Simple tasks]`,
+    
+    Q7_Other_Reasons = `Q7 If you listen to background music for any other reasons, please specify:`,
+    Q7_Text_Categories = `Q7 Text Categories`,
+    
+    Q8_Complex_Avoidance = `Q8 Why do you avoid listening to background music while performing following tasks? [Complex tasks]`,
+    Q8_Simple_Avoidance = `Q8 Why do you avoid listening to background music while performing following tasks? [Simple tasks]`,
+    
+    Q9_Other_Avoidance_Reasons = `Q9 If you avoid listening to background music for any other reasons, please specify:`,
+    Q9_Text_Categories = `Q9 Text Categories`,
+    
+    Q10_Complex_Effect = `Q10 How does listening to background music over longer periods affect you while performing following tasks? [Complex tasks]`,
+    Q10_Simple_Effect = `Q10 How does listening to background music over longer periods affect you while performing following tasks? [Simple tasks]`,
+    
+    Q11_Other_Effects = `Q11 If listening to background music over longer periods affects you in any other ways during the tasks please specify:`,
+    Q11_Text_Categories = `Q11 Text Categories`,
+    
+    Q12_Talkative = `Q12 [I see myself as someone who is talkative]`,
+    Q13_Reserved = `Q13 [I see myself as someone who is reserved]`,
+    Q14_Energetic = `Q14 [I see myself as someone who is full of energy]`,
+    Q15_Enthusiastic = `Q15 [I see myself as someone who generates a lot of enthusiasm]`,
+    Q16_Quiet = `Q16 [I see myself as someone who tends to be quiet]`,
+    Q17_Assertive = `Q17 [I see myself as someone who has an assertive personality ]`,
+    Q18_Shy = `Q18 [I see myself as someone who is sometimes shy, inhibited]`,
+    Q19_Sociable = `Q19 [I see myself as someone who is outgoing, sociable]`,
+    
+    Age = `Q20 What is your age in years?`,
+    Gender = `Q21 What is your gender?`,
+    
+    Q6_Other_Reason = `Q6 Why do you listen to background music while performing following tasks? [Other]`,
+    
+    Extraversion_Score = `Extraversion Score`,
+    Personality_Type = `Personality`,
+    Age_Bracket = `Age Brackets`
+  )
+
+# Recode Q1 (Background Music Listening Habit)
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Q1_Music_Listen = case_when(
+      Q1_Music_Listen == "Yes" ~ 1,
+      Q1_Music_Listen == "No" ~ 0,
+      TRUE ~ NA_real_
+    )
+  )
+
+# Recode Q2 (Frequency of Listening During Tasks) for Complex and Simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Q2_Freq_Complex = case_when(
+      Q2_Freq_Complex == "Never" ~ 1,
+      Q2_Freq_Complex == "Rarely" ~ 2,
+      Q2_Freq_Complex == "Sometimes" ~ 3,
+      Q2_Freq_Complex == "Often" ~ 4,
+      Q2_Freq_Complex == "Always" ~ 5,
+      TRUE ~ NA_real_
+    ),
+    Q2_Freq_Simple = case_when(
+      Q2_Freq_Simple == "Never" ~ 1,
+      Q2_Freq_Simple == "Rarely" ~ 2,
+      Q2_Freq_Simple == "Sometimes" ~ 3,
+      Q2_Freq_Simple == "Often" ~ 4,
+      Q2_Freq_Simple == "Always" ~ 5,
+      TRUE ~ NA_real_
+    )
+  )
+
+
+# Transform response options to numeric scores, with adjustments for reverse-coded items
+Raw_Data <- Raw_Data %>%
+  mutate(
+    # Regular coding
+    Q12_Talkative = recode(Q12_Talkative, 
+                           "Disagree strongly" = 1, "Disagree a little" = 2, 
+                           "Neither agree nor disagree" = 3, "Agree" = 4, 
+                           "Strongly agree" = 5),
+    Q14_Energetic = recode(Q14_Energetic, 
+                           "Disagree strongly" = 1, "Disagree a little" = 2, 
+                           "Neither agree nor disagree" = 3, "Agree" = 4, 
+                           "Strongly agree" = 5),
+    Q15_Enthusiastic = recode(Q15_Enthusiastic, 
+                              "Disagree strongly" = 1, "Disagree a little" = 2, 
+                              "Neither agree nor disagree" = 3, "Agree" = 4, 
+                              "Strongly agree" = 5),
+    Q17_Assertive = recode(Q17_Assertive, 
+                           "Disagree strongly" = 1, "Disagree a little" = 2, 
+                           "Neither agree nor disagree" = 3, "Agree" = 4, 
+                           "Strongly agree" = 5),
+    Q19_Sociable = recode(Q19_Sociable, 
+                          "Disagree strongly" = 1, "Disagree a little" = 2, 
+                          "Neither agree nor disagree" = 3, "Agree" = 4, 
+                          "Strongly agree" = 5),
+    
+    # Reverse-coded items
+    Q13_Reserved = recode(Q13_Reserved, 
+                          "Disagree strongly" = 5, "Disagree a little" = 4, 
+                          "Neither agree nor disagree" = 3, "Agree" = 2, 
+                          "Strongly agree" = 1),
+    Q16_Quiet = recode(Q16_Quiet, 
+                       "Disagree strongly" = 5, "Disagree a little" = 4, 
+                       "Neither agree nor disagree" = 3, "Agree" = 2, 
+                       "Strongly agree" = 1),
+    Q18_Shy = recode(Q18_Shy, 
+                     "Disagree strongly" = 5, "Disagree a little" = 4, 
+                     "Neither agree nor disagree" = 3, "Agree" = 2, 
+                     "Strongly agree" = 1)
+  )
+
+# Calculate Extraversion Score as the average of Q12 to Q19
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Extraversion_Score = rowMeans(select(., Q12_Talkative, Q13_Reserved, Q14_Energetic, 
+                                         Q15_Enthusiastic, Q16_Quiet, Q17_Assertive, 
+                                         Q18_Shy, Q19_Sociable), na.rm = TRUE)
+  )
+
+# Categorize participants as Extrovert or Introvert based on the Extraversion_Score
+Raw_Data <- Raw_Data %>%
+  mutate(Personality_Type = ifelse(Extraversion_Score > 2.5, "Extrovert", "Introvert"))
+
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Age = as.numeric(substr(Age, 1, 2))  # Extract the first two characters and convert to numeric
+  )
+
+# Populate Age_Bracket based on Age with specified ranks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Age_Bracket = case_when(
+      Age >= 18 & Age <= 25 ~ 6,
+      Age >= 26 & Age <= 35 ~ 5,
+      Age >= 36 & Age <= 45 ~ 4,
+      Age >= 46 & Age <= 55 ~ 3,
+      Age >= 56 & Age <= 65 ~ 2,
+      Age >= 66           ~ 1,
+      TRUE ~ NA_real_ # Assign NA for any missing or out-of-range ages
+    )
+  )
+
+# Create binary columns for each music type in each task category
+Raw_Data <- Raw_Data %>%
+  mutate(
+    # Complex task music types
+    Q4_Complex_Type_Vocal = if_else(str_detect(Q4_Complex_Type, "Vocal"), 1, 0),
+    Q4_Complex_Type_Instrumental = if_else(str_detect(Q4_Complex_Type, "Instrumental"), 1, 0),
+    Q4_Complex_Type_Upbeat = if_else(str_detect(Q4_Complex_Type, "Upbeat"), 1, 0),
+    Q4_Complex_Type_Calming = if_else(str_detect(Q4_Complex_Type, "Calming"), 1, 0),
+    Q4_Complex_Type_Not_Applicable = if_else(str_detect(Q4_Complex_Type, "Not applicable"), 1, 0),
+    Q4_Complex_Type_Other = if_else(str_detect(Q4_Complex_Type, "Other"), 1, 0),
+    
+    # Simple task music types
+    Q4_Simple_Type_Vocal = if_else(str_detect(Q4_Simple_Type, "Vocal"), 1, 0),
+    Q4_Simple_Type_Instrumental = if_else(str_detect(Q4_Simple_Type, "Instrumental"), 1, 0),
+    Q4_Simple_Type_Upbeat = if_else(str_detect(Q4_Simple_Type, "Upbeat"), 1, 0),
+    Q4_Simple_Type_Calming = if_else(str_detect(Q4_Simple_Type, "Calming"), 1, 0),
+    Q4_Simple_Type_Not_Applicable = if_else(str_detect(Q4_Simple_Type, "Not applicable"), 1, 0),
+    Q4_Simple_Type_Other = if_else(str_detect(Q4_Simple_Type, "Other"), 1, 0),
+    
+    # Other tasks music types
+    Q4_Other_Type_Vocal = if_else(str_detect(Q4_Other_Type, "Vocal"), 1, 0),
+    Q4_Other_Type_Instrumental = if_else(str_detect(Q4_Other_Type, "Instrumental"), 1, 0),
+    Q4_Other_Type_Upbeat = if_else(str_detect(Q4_Other_Type, "Upbeat"), 1, 0),
+    Q4_Other_Type_Calming = if_else(str_detect(Q4_Other_Type, "Calming"), 1, 0),
+    Q4_Other_Type_Not_Applicable = if_else(str_detect(Q4_Other_Type, "Not applicable"), 1, 0),
+    Q4_Other_Type_Other = if_else(str_detect(Q4_Other_Type, "Other"), 1, 0)
+  )
+
+# Create binary columns for each reason in Q6 for Complex and Simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    # Complex task reasons
+    Q6_Complex_Reason_Noise = if_else(str_detect(Q6_Complex_Reason, "To mask other background noise"), 1, 0),
+    Q6_Complex_Reason_Concentrate = if_else(str_detect(Q6_Complex_Reason, "To help me concentrate on task"), 1, 0),
+    Q6_Complex_Reason_Mood = if_else(str_detect(Q6_Complex_Reason, "To set me into the right mood"), 1, 0),
+    Q6_Complex_Reason_Not_Applicable = if_else(str_detect(Q6_Complex_Reason, "Not applicable"), 1, 0),
+    
+    # Simple task reasons
+    Q6_Simple_Reason_Noise = if_else(str_detect(Q6_Simple_Reason, "To mask other background noise"), 1, 0),
+    Q6_Simple_Reason_Concentrate = if_else(str_detect(Q6_Simple_Reason, "To help me concentrate on task"), 1, 0),
+    Q6_Simple_Reason_Mood = if_else(str_detect(Q6_Simple_Reason, "To set me into the right mood"), 1, 0),
+    Q6_Simple_Reason_Not_Applicable = if_else(str_detect(Q6_Simple_Reason, "Not applicable"), 1, 0)
+  )
+
+# Create binary columns for Q8 (Reasons for Avoiding Music) for Complex and Simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    # Complex task reasons for avoiding music
+    Q8_Complex_Distracts = if_else(str_detect(Q8_Complex_Avoidance, "Music distracts me from the task"), 1, 0),
+    Q8_Complex_Anxious = if_else(str_detect(Q8_Complex_Avoidance, "Music makes me anxious"), 1, 0),
+    Q8_Complex_No_Avoid = if_else(str_detect(Q8_Complex_Avoidance, "I do not avoid"), 1, 0),
+    
+    # Simple task reasons for avoiding music
+    Q8_Simple_Distracts = if_else(str_detect(Q8_Simple_Avoidance, "Music distracts me from the task"), 1, 0),
+    Q8_Simple_Anxious = if_else(str_detect(Q8_Simple_Avoidance, "Music makes me anxious"), 1, 0),
+    Q8_Simple_No_Avoid = if_else(str_detect(Q8_Simple_Avoidance, "I do not avoid"), 1, 0)
+  )
+
+# Create binary columns for Q10 (Effects of Listening to Music Over Longer Periods) for Complex and Simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    # Complex task effects
+    Q10_Complex_Alert = if_else(str_detect(Q10_Complex_Effect, "It keeps me stay alerted on task"), 1, 0),
+    Q10_Complex_Tired = if_else(str_detect(Q10_Complex_Effect, "It makes me tired"), 1, 0),
+    Q10_Complex_Neutral = if_else(str_detect(Q10_Complex_Effect, "It has neutral effect"), 1, 0),
+    
+    # Simple task effects
+    Q10_Simple_Alert = if_else(str_detect(Q10_Simple_Effect, "It keeps me stay alerted on task"), 1, 0),
+    Q10_Simple_Tired = if_else(str_detect(Q10_Simple_Effect, "It makes me tired"), 1, 0),
+    Q10_Simple_Neutral = if_else(str_detect(Q10_Simple_Effect, "It has neutral effect"), 1, 0)
+  )
+
+
+
+write.xlsx(Raw_Data, "Transformed_Survey_Data.xlsx")
+
+
+
+

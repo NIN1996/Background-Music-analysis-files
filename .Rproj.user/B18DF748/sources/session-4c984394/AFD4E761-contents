@@ -1,0 +1,217 @@
+library(rstatix)
+library(coin)
+
+# Function to calculate effect size (r) for Wilcoxon and Mann-Whitney tests
+calculate_effect_size <- function(U, n) {
+  z <- qnorm(U / (n * (n + 1) / 2))
+  r <- z / sqrt(n)
+  return(r)
+}
+
+# Function to calculate Cohen's g for McNemar's Test
+calculate_cohens_g <- function(yes_yes, yes_no, no_yes, no_no) {
+  g <- abs((yes_no - no_yes) / (yes_yes + yes_no + no_yes + no_no))
+  return(g)
+}
+
+################################################################################
+
+# H1: There is a significant difference in background music listening during simple and complex tasks
+
+# Calculate Descriptive Statistics for Q2_Freq_Complex and Q2_Freq_Simple
+descriptive_stats <- Raw_Data %>%
+  summarise(
+    Mean_Complex = mean(Q2_Freq_Complex, na.rm = TRUE),
+    SD_Complex = sd(Q2_Freq_Complex, na.rm = TRUE),
+    Median_Complex = median(Q2_Freq_Complex, na.rm = TRUE),
+    IQR_Complex = IQR(Q2_Freq_Complex, na.rm = TRUE),
+    
+    Mean_Simple = mean(Q2_Freq_Simple, na.rm = TRUE),
+    SD_Simple = sd(Q2_Freq_Simple, na.rm = TRUE),
+    Median_Simple = median(Q2_Freq_Simple, na.rm = TRUE),
+    IQR_Simple = IQR(Q2_Freq_Simple, na.rm = TRUE)
+  )
+
+# Display Descriptive Statistics
+print("Descriptive Statistics for Q2_Freq_Complex and Q2_Freq_Simple")
+print(descriptive_stats)
+
+# Run the Wilcoxon Signed Rank Test for H1
+wilcox_test_result <- wilcox.test(
+  Raw_Data$Q2_Freq_Complex,
+  Raw_Data$Q2_Freq_Simple,
+  paired = TRUE,
+  alternative = "two.sided"
+)
+
+# Calculate z-score for Wilcoxon Signed Rank Test
+n_h1 <- nrow(Raw_Data)  # Number of pairs
+W <- wilcox_test_result$statistic
+mu_W <- n_h1 * (n_h1 + 1) / 4
+sigma_W <- sqrt(n_h1 * (n_h1 + 1) * (2 * n_h1 + 1) / 24)
+
+z_score <- (W - mu_W) / sigma_W
+
+# Calculate effect size (r)
+effect_size_wilcox_h1 <- abs(z_score) / sqrt(n_h1)
+
+# Display test results and effect size
+print("Wilcoxon Signed Rank Test Result for Q2_Freq_Complex and Q2_Freq_Simple")
+print(wilcox_test_result)
+print(paste("Effect Size (r) for H1:", round(effect_size_wilcox_h1, 2)))
+
+
+################################################################################
+
+# H2: More people will report listening to vocal, upbeat music during simple tasks than during complex tasks
+
+# Calculate frequency counts for each music type during complex and simple tasks
+complex_task_counts <- Raw_Data %>%
+  summarise(
+    Complex_Vocal = sum(Q4_Complex_Type_Vocal, na.rm = TRUE),
+    Complex_Instrumental = sum(Q4_Complex_Type_Instrumental, na.rm = TRUE),
+    Complex_Upbeat = sum(Q4_Complex_Type_Upbeat, na.rm = TRUE),
+    Complex_Calming = sum(Q4_Complex_Type_Calming, na.rm = TRUE),
+    Complex_None = sum(Q4_Complex_Type_Not_Applicable, na.rm = TRUE),
+    Complex_Other = sum(Q4_Complex_Type_Other, na.rm = TRUE)
+  )
+
+simple_task_counts <- Raw_Data %>%
+  summarise(
+    Simple_Vocal = sum(Q4_Simple_Type_Vocal, na.rm = TRUE),
+    Simple_Instrumental = sum(Q4_Simple_Type_Instrumental, na.rm = TRUE),
+    Simple_Upbeat = sum(Q4_Simple_Type_Upbeat, na.rm = TRUE),
+    Simple_Calming = sum(Q4_Simple_Type_Calming, na.rm = TRUE),
+    Simple_None = sum(Q4_Simple_Type_Not_Applicable, na.rm = TRUE),
+    Simple_Other = sum(Q4_Simple_Type_Other, na.rm = TRUE)
+  )
+
+print("Frequency Counts for Complex Tasks")
+print(complex_task_counts)
+print("Frequency Counts for Simple Tasks")
+print(simple_task_counts)
+
+# Create binary variables for Vocal and Upbeat selections in complex and simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Vocal_Complex = ifelse(Q4_Complex_Type_Vocal == 1, 1, 0),
+    Vocal_Simple = ifelse(Q4_Simple_Type_Vocal == 1, 1, 0),
+    Upbeat_Complex = ifelse(Q4_Complex_Type_Upbeat == 1, 1, 0),
+    Upbeat_Simple = ifelse(Q4_Simple_Type_Upbeat == 1, 1, 0)
+  )
+
+# Run McNemar's Test for each contingency table
+vocal_table <- table(Raw_Data$Vocal_Complex, Raw_Data$Vocal_Simple)
+upbeat_table <- table(Raw_Data$Upbeat_Complex, Raw_Data$Upbeat_Simple)
+
+vocal_mcnemar <- mcnemar.test(vocal_table)
+upbeat_mcnemar <- mcnemar.test(upbeat_table)
+
+# Calculate Cohen's g for McNemar's test (H2)
+g_vocal <- calculate_cohens_g(vocal_table[1, 1], vocal_table[1, 2], vocal_table[2, 1], vocal_table[2, 2])
+g_upbeat <- calculate_cohens_g(upbeat_table[1, 1], upbeat_table[1, 2], upbeat_table[2, 1], upbeat_table[2, 2])
+
+print("McNemar's Test Result for Vocal Music Preference (Complex vs Simple Tasks)")
+print(vocal_mcnemar)
+print(paste("Effect Size (g) for Vocal Preference:", g_vocal))
+
+print("McNemar's Test Result for Upbeat Music Preference (Complex vs Simple Tasks)")
+print(upbeat_mcnemar)
+print(paste("Effect Size (g) for Upbeat Preference:", g_upbeat))
+
+################################################################################
+
+# H3: More extraverted people will report listening to background music during complex tasks than introverted people during complex tasks
+
+# Filter the data for Introverts and Extroverts
+filtered_data <- Raw_Data %>%
+  filter(Personality_Type %in% c("Introvert", "Extrovert"))
+
+# Run Mann-Whitney U Test for H3
+mann_whitney_test_h3 <- wilcox.test(
+  Q2_Freq_Complex ~ Personality_Type,
+  data = filtered_data,
+  alternative = "greater"
+)
+
+# Extract W (test statistic) and calculate z
+W_h3 <- mann_whitney_test_h3$statistic
+n_h3 <- nrow(filtered_data)
+
+# Approximate mean and standard deviation of W
+mean_W <- n_h3 * (n_h3 + 1) / 4
+sd_W <- sqrt(n_h3 * (n_h3 + 1) * (2 * n_h3 + 1) / 24)
+
+# Calculate z-score
+z_h3 <- (W_h3 - mean_W) / sd_W
+
+# Calculate effect size r
+effect_size_h3 <- z_h3 / sqrt(n_h3)
+
+# Display the test result and effect size
+print("Mann-Whitney Test Result for H3:")
+print(mann_whitney_test_h3)
+print(paste("Effect Size (r) for H3:", round(effect_size_h3, 2)))
+
+
+################################################################################
+# H4: More introverts will report listening to non-vocal, calming music during complex tasks than extraverts
+
+# Ensure composite score for non-vocal, calming music exists
+Raw_Data <- Raw_Data %>%
+  mutate(NonVocal_Calming_Complex = Q4_Complex_Type_Instrumental + Q4_Complex_Type_Calming)
+
+# Filter data for Introverts and Extroverts
+filtered_data_h4 <- Raw_Data %>%
+  filter(Personality_Type %in% c("Introvert", "Extrovert"))
+
+# Run Mann-Whitney Test for H4
+mann_whitney_test_h4 <- wilcox.test(
+  NonVocal_Calming_Complex ~ Personality_Type,
+  data = filtered_data_h4,
+  alternative = "greater"
+)
+
+# Calculate effect size (r) for Mann-Whitney test (H4) using the z-score method
+z_h4 <- qnorm(mann_whitney_test_h4$p.value / 2, lower.tail = FALSE) * sign(mann_whitney_test_h4$statistic - (nrow(filtered_data_h4)/2 * (nrow(filtered_data_h4)+1)))
+effect_size_h4 <- abs(z_h4) / sqrt(nrow(filtered_data_h4))
+
+# Display results for H4
+print("Mann-Whitney Test Result for H4")
+print(mann_whitney_test_h4)
+print(paste("Effect Size (r) for H4:", round(effect_size_h4, 2)))
+
+################################################################################
+# H5: More males will report listening to non-vocal, calming music during complex tasks than females
+
+# Filter data for Males and Females
+filtered_data_h5 <- Raw_Data %>%
+  filter(Gender %in% c("Male", "Female"))
+
+# Run Mann-Whitney U Test for H5
+mann_whitney_test_h5 <- wilcox.test(
+  NonVocal_Calming_Complex ~ Gender,
+  data = filtered_data_h5,
+  alternative = "greater"
+)
+
+# Calculate effect size (r) for Mann-Whitney test (H5) using the z-score method
+z_h5 <- qnorm(mann_whitney_test_h5$p.value / 2, lower.tail = FALSE) * sign(mann_whitney_test_h5$statistic - (nrow(filtered_data_h5)/2 * (nrow(filtered_data_h5)+1)))
+effect_size_h5 <- abs(z_h5) / sqrt(nrow(filtered_data_h5))
+
+# Display results for H5
+print("Mann-Whitney Test Result for H5:")
+print(mann_whitney_test_h5)
+print(paste("Effect Size (r) for H5:", round(effect_size_h5, 2)))
+
+################################################################################
+
+# H6: Less older than younger participants will listen to background music during complex tasks (Spearman's Correlation)
+
+# Run Spearman's Rank Correlation for H6
+spearman_test <- cor.test(Raw_Data$Age, Raw_Data$Q2_Freq_Complex, method = "spearman")
+
+# Display Spearman's correlation coefficient (rho as effect size)
+print("Spearman's Rank Correlation Test Result for H6:")
+print(spearman_test)
+print(paste("Effect Size (rho) for H6:", spearman_test$estimate))

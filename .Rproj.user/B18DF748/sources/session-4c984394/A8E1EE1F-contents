@@ -1,0 +1,32 @@
+# H3: More extraverted people will report listening to background music during complex tasks than introverted people during complex tasks
+
+# Filter the data for Introverts and Extroverts
+filtered_data <- Raw_Data %>%
+  filter(Personality_Type %in% c("Introvert", "Extrovert"))
+
+# Run Mann-Whitney U Test for H3
+mann_whitney_test_h3 <- wilcox.test(
+  Q2_Freq_Complex ~ Personality_Type,
+  data = filtered_data,
+  alternative = "greater"
+)
+
+# Extract W (test statistic) and calculate z
+W_h3 <- mann_whitney_test_h3$statistic
+n_h3 <- nrow(filtered_data)
+
+# Approximate mean and standard deviation of W
+mean_W <- n_h3 * (n_h3 + 1) / 4
+sd_W <- sqrt(n_h3 * (n_h3 + 1) * (2 * n_h3 + 1) / 24)
+
+# Calculate z-score
+z_h3 <- (W_h3 - mean_W) / sd_W
+
+# Calculate effect size r
+effect_size_h3 <- z_h3 / sqrt(n_h3)
+
+# Display the test result and effect size
+print("Mann-Whitney Test Result for H3:")
+print(mann_whitney_test_h3)
+print(paste("Effect Size (r) for H3:", round(effect_size_h3, 2)))
+

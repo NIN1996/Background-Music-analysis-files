@@ -1,0 +1,564 @@
+library(rstatix)
+library(coin)
+require(moments)
+
+
+# Function to calculate effect size (r) for Wilcoxon and Mann-Whitney tests
+calculate_effect_size <- function(U, n) {
+  z <- qnorm(U / (n * (n + 1) / 2))
+  r <- z / sqrt(n)
+  return(r)
+}
+
+# Function to calculate Cohen's g for McNemar's Test
+calculate_cohens_g <- function(yes_yes, yes_no, no_yes, no_no) {
+  g <- abs((yes_no - no_yes) / (yes_yes + yes_no + no_yes + no_no))
+  return(g)
+}
+
+################################################################################
+
+# H1: There is a significant difference in background music listening during simple and complex tasks
+
+
+# Calculate Descriptive Statistics for Q2_Freq_Complex and Q2_Freq_Simple
+descriptive_stats <- Raw_Data %>%
+  summarise(
+    Mean_Complex = mean(Q2_Freq_Complex, na.rm = TRUE),
+    SD_Complex = sd(Q2_Freq_Complex, na.rm = TRUE),
+    Median_Complex = median(Q2_Freq_Complex, na.rm = TRUE),
+    IQR_Complex = IQR(Q2_Freq_Complex, na.rm = TRUE),
+    Skewness_Complex = skewness(Q2_Freq_Complex, na.rm = TRUE),
+    Kurtosis_Complex = kurtosis(Q2_Freq_Complex, na.rm = TRUE),
+    
+    Mean_Simple = mean(Q2_Freq_Simple, na.rm = TRUE),
+    SD_Simple = sd(Q2_Freq_Simple, na.rm = TRUE),
+    Median_Simple = median(Q2_Freq_Simple, na.rm = TRUE),
+    IQR_Simple = IQR(Q2_Freq_Simple, na.rm = TRUE),
+    Skewness_Simple = skewness(Q2_Freq_Simple, na.rm = TRUE),
+    Kurtosis_Simple = kurtosis(Q2_Freq_Simple, na.rm = TRUE),
+  )
+
+# Display Descriptive Statistics
+print("Descriptive Statistics for Q2_Freq_Complex and Q2_Freq_Simple")
+print(descriptive_stats, width = Inf)
+
+
+# Perform Jarque-Bera test for Q2_Freq_Complex
+jb_test_complex <- jarque.test(Raw_Data$Q2_Freq_Complex)
+print("Jarque-Bera Test for Q2_Freq_Complex:")
+print(jb_test_complex)
+
+# Perform Jarque-Bera test for Q2_Freq_Simple
+jb_test_simple <- jarque.test(Raw_Data$Q2_Freq_Simple)
+print("Jarque-Bera Test for Q2_Freq_Simple:")
+print(jb_test_simple)
+
+
+# Run the Wilcoxon Signed Rank Test for H1
+wilcox_test_result <- wilcox.test(
+  Raw_Data$Q2_Freq_Complex,
+  Raw_Data$Q2_Freq_Simple,
+  paired = TRUE,
+  alternative = "two.sided"
+)
+
+# Calculate z-score for Wilcoxon Signed Rank Test
+n_h1 <- nrow(Raw_Data)  # Number of pairs
+W <- wilcox_test_result$statistic
+mu_W <- n_h1 * (n_h1 + 1) / 4
+sigma_W <- sqrt(n_h1 * (n_h1 + 1) * (2 * n_h1 + 1) / 24)
+
+z_score <- (W - mu_W) / sigma_W
+
+# Calculate effect size (r)
+effect_size_wilcox_h1 <- abs(z_score) / sqrt(n_h1)
+
+# Display test results and effect size
+print("Wilcoxon Signed Rank Test Result for Q2_Freq_Complex and Q2_Freq_Simple")
+print(wilcox_test_result)
+print(paste("Effect Size (r) for H1:", round(effect_size_wilcox_h1, 2)))
+
+
+plot(
+  Raw_Data$Q2_Freq_Complex, 
+  Raw_Data$Q2_Freq_Simple,
+  pch = 16,
+  xlab = "Frequency of Complex Tasks",
+  ylab = "Frequency of Simple Tasks",
+  main = "1-to-1 Plot of Listening Frequencies",
+  xlim = c(0.5, 5.5),                   # Sets x-axis limits
+  ylim = c(1.5, 5.5)                    # Sets y-axis limits
+)
+
+abline(0, 1, col = "blue", lwd = 2)
+
+# Range of Q2_Freq_Complex
+range_complex <- range(Raw_Data$Q2_Freq_Complex, na.rm = TRUE)
+print(paste("Range of Q2_Freq_Complex:", range_complex[1], "to", range_complex[2]))
+
+# Range of Q2_Freq_Simple
+range_simple <- range(Raw_Data$Q2_Freq_Simple, na.rm = TRUE)
+print(paste("Range of Q2_Freq_Simple:", range_simple[1], "to", range_simple[2]))
+
+
+
+################################################################################
+
+# H2: More people will report listening to vocal, upbeat music during simple tasks than during complex tasks
+
+# Calculate frequency counts for each music type during complex and simple tasks
+complex_task_counts <- Raw_Data %>%
+  summarise(
+    Complex_Vocal = sum(Q4_Complex_Type_Vocal, na.rm = TRUE),
+    Complex_Instrumental = sum(Q4_Complex_Type_Instrumental, na.rm = TRUE),
+    Complex_Upbeat = sum(Q4_Complex_Type_Upbeat, na.rm = TRUE),
+    Complex_Calming = sum(Q4_Complex_Type_Calming, na.rm = TRUE),
+    Complex_None = sum(Q4_Complex_Type_Not_Applicable, na.rm = TRUE),
+    Complex_Other = sum(Q4_Complex_Type_Other, na.rm = TRUE)
+  )
+
+simple_task_counts <- Raw_Data %>%
+  summarise(
+    Simple_Vocal = sum(Q4_Simple_Type_Vocal, na.rm = TRUE),
+    Simple_Instrumental = sum(Q4_Simple_Type_Instrumental, na.rm = TRUE),
+    Simple_Upbeat = sum(Q4_Simple_Type_Upbeat, na.rm = TRUE),
+    Simple_Calming = sum(Q4_Simple_Type_Calming, na.rm = TRUE),
+    Simple_None = sum(Q4_Simple_Type_Not_Applicable, na.rm = TRUE),
+    Simple_Other = sum(Q4_Simple_Type_Other, na.rm = TRUE)
+  )
+
+print("Frequency Counts for Complex Tasks")
+print(complex_task_counts)
+print("Frequency Counts for Simple Tasks")
+print(simple_task_counts)
+
+# Create binary variables for Vocal and Upbeat selections in complex and simple tasks
+Raw_Data <- Raw_Data %>%
+  mutate(
+    Vocal_Complex = ifelse(Q4_Complex_Type_Vocal == 1, 1, 0),
+    Vocal_Simple = ifelse(Q4_Simple_Type_Vocal == 1, 1, 0),
+    Upbeat_Complex = ifelse(Q4_Complex_Type_Upbeat == 1, 1, 0),
+    Upbeat_Simple = ifelse(Q4_Simple_Type_Upbeat == 1, 1, 0)
+  )
+
+# Display contingency table for Vocal Preference
+print("Contingency Table for Vocal Music Preference (Complex vs Simple Tasks):")
+vocal_table <- table(Raw_Data$Vocal_Complex, Raw_Data$Vocal_Simple)
+colnames(vocal_table) <- c("Simple: No", "Simple: Yes")
+rownames(vocal_table) <- c("Complex: No", "Complex: Yes")
+print(vocal_table)
+
+# Display contingency table for Upbeat Preference
+print("Contingency Table for Upbeat Music Preference (Complex vs Simple Tasks):")
+upbeat_table <- table(Raw_Data$Upbeat_Complex, Raw_Data$Upbeat_Simple)
+colnames(upbeat_table) <- c("Simple: No", "Simple: Yes")
+rownames(upbeat_table) <- c("Complex: No", "Complex: Yes")
+print(upbeat_table)
+
+# Run McNemar's Test for each contingency table
+vocal_table <- table(Raw_Data$Vocal_Complex, Raw_Data$Vocal_Simple)
+upbeat_table <- table(Raw_Data$Upbeat_Complex, Raw_Data$Upbeat_Simple)
+
+vocal_mcnemar <- mcnemar.test(vocal_table)
+upbeat_mcnemar <- mcnemar.test(upbeat_table)
+
+# Calculate Cohen's g for McNemar's test (H2)
+g_vocal <- calculate_cohens_g(vocal_table[1, 1], vocal_table[1, 2], vocal_table[2, 1], vocal_table[2, 2])
+g_upbeat <- calculate_cohens_g(upbeat_table[1, 1], upbeat_table[1, 2], upbeat_table[2, 1], upbeat_table[2, 2])
+
+print("McNemar's Test Result for Vocal Music Preference (Complex vs Simple Tasks)")
+print(vocal_mcnemar)
+print(paste("Effect Size (g) for Vocal Preference:", g_vocal))
+
+print("McNemar's Test Result for Upbeat Music Preference (Complex vs Simple Tasks)")
+print(upbeat_mcnemar)
+print(paste("Effect Size (g) for Upbeat Preference:", g_upbeat))
+
+
+
+
+
+################################################################################
+
+# H3: More extraverted people will report listening to background music during complex tasks than introverted people during complex tasks
+
+
+par(mfrow=c(1,2))
+hist(filtered_data$Q2_Freq_Complex[filtered_data$Personality_Type == "Introvert"], 
+     main = "Histogram for Introverts", 
+     xlab = "Frequency of Background Music during Complex Tasks")
+hist(filtered_data$Q2_Freq_Complex[filtered_data$Personality_Type == "Extrovert"], 
+     main = "Histogram for Extroverts", 
+     xlab = "Frequency of Background Music during Complex Tasks")
+
+library(knitr)
+
+# 2. Descriptive Statistics
+
+# Summary statistics by group
+library(dplyr)
+descriptive_stats <- filtered_data %>%
+  group_by(Personality_Type) %>%
+  summarise(
+    median = median(Q2_Freq_Complex),
+    iqr = IQR(Q2_Freq_Complex),
+    n = n()
+  )
+print("Descriptive Statistics:")
+print(descriptive_stats)
+
+# Create a data frame for the test results
+test_results <- data.frame(
+  Statistic_W = W_h3,
+  P_Value = mann_whitney_test_h3$p.value,
+  Effect_Size_r = round(effect_size_h3, 2)
+)
+
+
+
+# Print descriptive statistics in a table
+cat("Descriptive Statistics:\n")
+kable(descriptive_stats, format = "markdown", digits = 2)
+
+# Print the test results in a table
+cat("Mann-Whitney Test Results:\n")
+kable(test_results, format = "markdown", digits = 3)
+
+# Filter the data for Introverts and Extroverts
+filtered_data <- Raw_Data %>%
+  filter(Personality_Type %in% c("Introvert", "Extrovert"))
+
+library(dplyr)
+
+# Calculate ranks for Q2_Freq_Complex
+filtered_data <- filtered_data %>%
+  mutate(Rank = rank(Q2_Freq_Complex))
+
+# Calculate sum of ranks by Personality_Type
+sum_of_ranks <- filtered_data %>%
+  group_by(Personality_Type) %>%
+  summarise(
+    Sum_of_Ranks = sum(Rank),
+    Count = n()  # Optional: to check sample size
+  )
+
+# Print the sum of ranks
+cat("Sum of Ranks by Personality_Type:\n")
+print(sum_of_ranks)
+
+# Run Mann-Whitney U Test for H3
+mann_whitney_test_h3 <- wilcox.test(
+  Q2_Freq_Complex ~ Personality_Type,
+  data = filtered_data,
+  alternative = "greater"
+)
+
+# Extract W (test statistic) and calculate z
+W_h3 <- mann_whitney_test_h3$statistic
+n_h3 <- nrow(filtered_data)
+
+# Approximate mean and standard deviation of W
+mean_W <- n_h3 * (n_h3 + 1) / 4
+sd_W <- sqrt(n_h3 * (n_h3 + 1) * (2 * n_h3 + 1) / 24)
+
+# Calculate z-score
+z_h3 <- (W_h3 - mean_W) / sd_W
+
+# Calculate effect size r
+effect_size_h3 <- z_h3 / sqrt(n_h3)
+
+# Display the test result and effect size
+print("Mann-Whitney Test Result for H3:")
+print(mann_whitney_test_h3)
+print(paste("Effect Size (r) for H3:", round(effect_size_h3, 2)))
+
+
+# Compute mean extraversion by group
+mean_extraversion <- filtered_data %>%
+  group_by(Personality_Type) %>%
+  summarise(
+    mean_extraversion = mean(Extraversion_Score, na.rm = TRUE),
+    n = n()  # Include sample size for reference
+  )
+
+# Print Mean Extraversion
+print("Mean Extraversion by Personality Type:")
+print(mean_extraversion)
+
+overall_mean_extraversion <- mean(filtered_data$Extraversion_Score, na.rm = TRUE)
+print(paste("Overall Mean Extraversion Score:", round(overall_mean_extraversion, 2)))
+
+
+
+################################################################################
+# H4: More introverts will report listening to non-vocal, calming music during complex tasks than extraverts
+
+# Ensure composite score for non-vocal, calming music exists
+Raw_Data <- Raw_Data %>%
+  mutate(NonVocal_Calming_Complex = Q4_Complex_Type_Instrumental + Q4_Complex_Type_Calming)
+
+# Filter data for Introverts and Extroverts
+filtered_data_h4 <- Raw_Data %>%
+  filter(Personality_Type %in% c("Introvert", "Extrovert"))
+
+
+# Median
+tapply_median <- tapply(filtered_data_h4$NonVocal_Calming_Complex, 
+                        filtered_data_h4$Personality_Type, 
+                        median, 
+                        na.rm = TRUE)
+
+# IQR
+tapply_iqr <- tapply(filtered_data_h4$NonVocal_Calming_Complex, 
+                     filtered_data_h4$Personality_Type, 
+                     IQR, 
+                     na.rm = TRUE)
+
+# Combine results
+data.frame(
+  Personality_Type = names(tapply_median),
+  Median = as.numeric(tapply_median),
+  IQR = as.numeric(tapply_iqr)
+)
+
+
+
+# Set the layout for two plots side by side
+par(mfrow = c(1, 2))  
+
+# Histogram for Introverts
+hist(
+  filtered_data_h4$NonVocal_Calming_Complex[filtered_data_h4$Personality_Type == "Introvert"],
+  main = "Histogram for Introverts",           # Title for the histogram
+  xlab = "NonVocal_Calming_Complex",           # Label for the x-axis
+  ylab = "Frequency",                          # Label for the y-axis
+  breaks = c(-0.5, 0.5, 1.5, 2.5),             # Bin edges centered around discrete values
+  col = "lightblue",                           # Bar color
+  border = "black",                            # Bar border color
+  xaxt = "n"                                   # Suppress default x-axis labels
+)
+axis(1, at = c(0, 1, 2))                       # Add custom x-axis labels for 0, 1, 2
+
+# Histogram for Extroverts
+hist(
+  filtered_data_h4$NonVocal_Calming_Complex[filtered_data_h4$Personality_Type == "Extrovert"],
+  main = "Histogram for Extroverts",           # Title for the histogram
+  xlab = "NonVocal_Calming_Complex",           # Label for the x-axis
+  ylab = "Frequency",                          # Label for the y-axis
+  breaks = c(-0.5, 0.5, 1.5, 2.5),             # Bin edges centered around discrete values
+  col = "lightgreen",                          # Bar color
+  border = "black",                            # Bar border color
+  xaxt = "n"                                   # Suppress default x-axis labels
+)
+axis(1, at = c(0, 1, 2))                       # Add custom x-axis labels for 0, 1, 2
+
+
+
+library(dplyr)
+
+ # Calculate ranks for the dependent variable
+filtered_data_h4 <- filtered_data_h4 %>%
+  mutate(Rank = rank(NonVocal_Calming_Complex))
+
+# Calculate sum of ranks by Personality_Type
+sum_of_ranks <- filtered_data_h4 %>%
+  group_by(Personality_Type) %>%
+  summarise(
+    Sum_of_Ranks = sum(Rank),
+    Count = n()  # Optional: to check sample size
+  )
+
+# Print the sum of ranks
+print("Sum of Ranks by Group:")
+print(sum_of_ranks)
+
+
+
+# Run Mann-Whitney Test for H4
+mann_whitney_test_h4 <- wilcox.test(
+  NonVocal_Calming_Complex ~ Personality_Type,
+  data = filtered_data_h4,
+  alternative = "greater"
+)
+
+# Calculate effect size (r) for Mann-Whitney test (H4) using the z-score method
+z_h4 <- qnorm(mann_whitney_test_h4$p.value / 2, lower.tail = FALSE) * sign(mann_whitney_test_h4$statistic - (nrow(filtered_data_h4)/2 * (nrow(filtered_data_h4)+1)))
+effect_size_h4 <- abs(z_h4) / sqrt(nrow(filtered_data_h4))
+
+# Display results for H4
+print("Mann-Whitney Test Result for H4")
+print(mann_whitney_test_h4)
+print(paste("Effect Size (r) for H4:", round(effect_size_h4, 2)))
+
+
+
+table(filtered_data_h4$NonVocal_Calming_Complex)
+table(filtered_data_h4$NonVocal_Calming_Complex[filtered_data_h4$Personality_Type == "Introvert"])
+table(filtered_data_h4$NonVocal_Calming_Complex[filtered_data_h4$Personality_Type == "Extrovert"])
+
+
+
+
+################################################################################
+# H5: More males will report listening to non-vocal, calming music during complex tasks than females
+
+# Filter data for Males and Females
+filtered_data_h5 <- Raw_Data %>%
+  filter(Gender %in% c("Male", "Female"))
+
+# Median and IQR by Gender
+tapply_median_h5 <- tapply(filtered_data_h5$NonVocal_Calming_Complex, 
+                           filtered_data_h5$Gender, 
+                           median, 
+                           na.rm = TRUE)
+
+tapply_iqr_h5 <- tapply(filtered_data_h5$NonVocal_Calming_Complex, 
+                        filtered_data_h5$Gender, 
+                        IQR, 
+                        na.rm = TRUE)
+
+# Combine medians and IQR into a data frame
+descriptive_stats_h5 <- data.frame(
+  Gender = names(tapply_median_h5),
+  Median = as.numeric(tapply_median_h5),
+  IQR = as.numeric(tapply_iqr_h5)
+)
+cat("Descriptive Statistics for H5:\n")
+print(descriptive_stats_h5)
+
+# Histograms to visualize distributions
+par(mfrow = c(1, 2))
+
+# Histogram for Males
+hist(
+  filtered_data_h5$NonVocal_Calming_Complex[filtered_data_h5$Gender == "Male"],
+  main = "Histogram for Males",
+  xlab = "NonVocal_Calming_Complex",
+  ylab = "Frequency",
+  breaks = c(-0.5, 0.5, 1.5, 2.5),
+  col = "lightgreen",
+  border = "black",
+  xaxt = "n"
+)
+axis(1, at = c(0, 1, 2))
+
+# Histogram for Females
+hist(
+  filtered_data_h5$NonVocal_Calming_Complex[filtered_data_h5$Gender == "Female"],
+  main = "Histogram for Females",
+  xlab = "NonVocal_Calming_Complex",
+  ylab = "Frequency",
+  breaks = c(-0.5, 0.5, 1.5, 2.5),
+  col = "lightpink",
+  border = "black",
+  xaxt = "n"
+)
+axis(1, at = c(0, 1, 2))
+
+# Calculate ranks for the dependent variable
+filtered_data_h5 <- filtered_data_h5 %>%
+  mutate(Rank = rank(NonVocal_Calming_Complex))
+
+# Sum of ranks by Gender
+sum_of_ranks_h5 <- filtered_data_h5 %>%
+  group_by(Gender) %>%
+  summarise(
+    Sum_of_Ranks = sum(Rank),
+    Count = n()
+  )
+cat("Sum of Ranks by Gender:\n")
+print(sum_of_ranks_h5)
+
+
+
+# Run Mann-Whitney U Test for H5
+mann_whitney_test_h5 <- wilcox.test(
+  NonVocal_Calming_Complex ~ Gender,
+  data = filtered_data_h5,
+  alternative = "greater"
+)
+
+# Calculate effect size (r) for Mann-Whitney test (H5) using the z-score method
+z_h5 <- qnorm(mann_whitney_test_h5$p.value / 2, lower.tail = FALSE) * sign(mann_whitney_test_h5$statistic - (nrow(filtered_data_h5)/2 * (nrow(filtered_data_h5)+1)))
+effect_size_h5 <- abs(z_h5) / sqrt(nrow(filtered_data_h5))
+
+# Display results for H5
+print("Mann-Whitney Test Result for H5:")
+print(mann_whitney_test_h5)
+print(paste("Effect Size (r) for H5:", round(effect_size_h5, 2)))
+
+
+# Frequency tables for additional insights
+cat("Frequency Table for NonVocal_Calming_Complex by Males:\n")
+print(table(filtered_data_h5$NonVocal_Calming_Complex[filtered_data_h5$Gender == "Male"]))
+
+cat("Frequency Table for NonVocal_Calming_Complex by Females:\n")
+print(table(filtered_data_h5$NonVocal_Calming_Complex[filtered_data_h5$Gender == "Female"]))
+################################################################################
+
+# H6: Less older than younger participants will listen to background music during complex tasks (Spearman's Correlation)
+
+require(moments)
+skewness_age <- skewness(Raw_Data$Age)
+skewness_freq <- skewness(Raw_Data$Q2_Freq_Complex)
+print(paste("Skewness for Age:", skewness_age))
+print(paste("Skewness for Frequency of Background Music:", skewness_freq))
+
+# Run Spearman's Rank Correlation for H6
+spearman_test <- cor.test(Raw_Data$Age, Raw_Data$Q2_Freq_Complex, method = "spearman")
+
+# Display Spearman's correlation coefficient (rho as effect size)
+print("Spearman's Rank Correlation Test Result for H6:")
+print(spearman_test)
+print(paste("Effect Size (rho) for H6:", spearman_test$estimate))
+
+
+# Run Spearman's Rank Correlation for H6
+spearman_test <- cor.test(Raw_Data$Age, Raw_Data$Q2_Freq_Complex, method = "spearman")
+
+# Display Spearman's correlation coefficient (rho as effect size)
+print("Spearman's Rank Correlation Test Result for H6:")
+print(spearman_test)
+print(paste("Effect Size (rho) for H6:", spearman_test$estimate))
+
+
+
+# Save the scatterplot to a PDF file in landscape format
+pdf("scatterplot_age_music.pdf", width = 12, height = 8)  # Landscape dimensions
+
+# Set graphical parameters for better layout and readability
+par(mar = c(5, 5, 4, 2))  # Adjust margins: c(bottom, left, top, right)
+
+# Create the scatterplot without a main title and legend
+plot(Raw_Data$Age, Raw_Data$Q2_Freq_Complex,
+     main = "",  # No title
+     xlab = "Age (Years)",
+     ylab = "Listening Frequency (1 = Never, 5 = Always)",
+     pch = 19, col = "blue", cex = 1.2,  # Larger points
+     cex.lab = 1.3, cex.axis = 1.2)  # Larger axis labels and tick marks
+
+# Add a regression line
+abline(lm(Raw_Data$Q2_Freq_Complex ~ Raw_Data$Age), col = "red", lwd = 2)  # Thicker regression line
+
+dev.off()  # Save the file and close the PDF device
+
+
+
+
+
+# Define the function for SE of skewness
+se.skew <- function(x) {
+  N <- length(na.omit(x))  # Exclude missing values
+  sqrt((6 * N * (N - 1)) / ((N - 2) * (N + 1) * (N + 3)))
+}
+
+# Calculate SE of skewness for Age
+se_skew_age <- se.skew(Raw_Data$Age)
+print(paste("SE of Skewness for Age:", se_skew_age))
+
+# Calculate SE of skewness for Frequency of Background Music
+se_skew_freq <- se.skew(Raw_Data$Q2_Freq_Complex)
+print(paste("SE of Skewness for Frequency of Background Music:", se_skew_freq))
+
+

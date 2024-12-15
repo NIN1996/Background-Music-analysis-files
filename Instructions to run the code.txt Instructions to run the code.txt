@@ -1,0 +1,8 @@
+1. Import raw data and load it.
+
+2. Then run transformation R scipt 
+
+3. Finally run tests R script
+
+4. Install the needed packages (bottom right window).
+
